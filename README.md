@@ -15,6 +15,8 @@ Multiple `.md` files can live in the prompt directory; pick which one is active 
 | `/system-prompt-show` | Print the first ~800 chars of the loaded prompt |
 | `/system-prompt-select` | Pick a different prompt file from the directory |
 
+Press **Ctrl+Shift+E** to edit the selected prompt in Pi's built-in editor. Saving updates the Markdown file immediately; the new content is used on your next message. Cancelling leaves the file unchanged, and an empty prompt is not saved.
+
 ## Modes
 
 **`append`** (default) — keep Pi's default system prompt as the base, and add the custom prompt as an extra section. Safest for most models, since Pi's tool descriptions stay authoritative.
@@ -85,6 +87,7 @@ system-prompt: disabled          # disabled
 ## How it works
 
 - The extension subscribes to `before_agent_start`, which fires on every user message. It reads the selected `.md` file from the prompt directory, then either appends it to or replaces Pi's resolved system prompt before sending to the model.
+- Ctrl+Shift+E opens the selected file's contents in Pi's built-in editor and saves edits back to that file.
 - In `replace` mode, the extension reconstructs the prompt as `customPrompt + tools + appendSystemPrompt + <project_context> + <available_skills> + date + cwd`, matching Pi's own assembly order so project context files and skills survive the swap. The available-skills block is emitted by a small inlined helper that mirrors Pi's `formatSkillsForPrompt` exactly (same XML escaping, same `disableModelInvocation` filtering); it is inlined rather than imported so the extension takes no runtime dependency on the host package and stays resolvable regardless of `node_modules` topology.
 - State (`enabled`, `mode`, `selectedFile`) persists to `~/.pi/agent/state/system-prompt.json` and is reloaded on the next start.
 - All commands are non-destructive: they mutate in-memory state, save to the state file, and take effect on the next message.

@@ -16,6 +16,7 @@
  *   /system-prompt-mode     Toggle between "replace" and "append" mode
  *   /system-prompt-show     Print the first ~800 chars of the loaded prompt
  *   /system-prompt-select   Pick a different prompt file from the directory
+ *   Ctrl+Shift+E            Edit the selected prompt in Pi's built-in editor
  *
  * How changes take effect
  * -----------------------
@@ -52,6 +53,7 @@
  */
 
 import * as fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { ExtensionAPI, Skill } from "@earendil-works/pi-coding-agent";
@@ -380,6 +382,47 @@ export default function systemPromptExtension(pi: ExtensionAPI) {
 			const preview = promptContent.slice(0, 800);
 			const tail = promptContent.length > 800 ? "\n\n[... truncated]" : "";
 			ctx.ui.notify(`${preview}${tail}`, "info");
+		},
+	});
+
+	pi.registerShortcut("ctrl+shift+e", {
+		description: "Edit the selected system prompt",
+		handler: async (ctx) => {
+			if (!selectedFile) {
+				ctx.ui.notify(`Prompt not loaded: ${loadError ?? "no file selected"}`, "error");
+				return;
+			}
+
+			const edited = await ctx.ui.editor(
+				`Edit system prompt: ${selectedFile}`,
+				promptContent ?? "",
+			);
+			if (edited === undefined) return;
+			if (!edited.trim()) {
+				ctx.ui.notify("System prompt was left unchanged: empty prompts are not saved.", "warning");
+				return;
+			}
+
+			const filePath = path.join(promptDir, selectedFile);
+			const tempPath = `${filePath}.${randomUUID()}.tmp`;
+			try {
+				fs.writeFileSync(tempPath, edited, { encoding: "utf-8", flag: "wx" });
+				fs.renameSync(tempPath, filePath);
+				loadPrompt();
+				updateStatus(ctx);
+				ctx.ui.notify(
+					`Saved ${selectedFile}.${enabled ? " Takes effect on your next message." : " Custom prompt is disabled."}`,
+					"info",
+				);
+			} catch (err) {
+				try {
+					fs.unlinkSync(tempPath);
+				} catch {}
+				ctx.ui.notify(
+					`Could not save ${selectedFile}: ${err instanceof Error ? err.message : String(err)}`,
+					"error",
+				);
+			}
 		},
 	});
 
